@@ -1,10 +1,11 @@
 # krork-game-
 <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tic Tac Toe - 5 in a Row Multiplayer (10x10 Grid)</title>
+    <title>Tic Tac Toe - 5 in a Row vs Bot (10x10 Grid)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -12,9 +13,6 @@
             flex-direction: column;
             align-items: center;
             background-color: #f0f0f0;
-        }
-        #lobby, #game {
-            text-align: center;
         }
         #board {
             display: grid;
@@ -53,97 +51,60 @@
         #restart:hover {
             background-color: #45a049;
         }
-        #room-id, #join-room-id {
-            margin: 10px;
-            padding: 5px;
-            font-size: 16px;
-        }
-        #create-room, #join-room {
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            background-color: #2196F3;
-            color: white;
-            border: none;
-            border-radius: 5px;
-        }
-        #create-room:hover, #join-room:hover {
-            background-color: #1976D2;
-        }
     </style>
 </head>
 <body>
-    <h1>Tic Tac Toe - 5 in a Row Multiplayer</h1>
-    <div id="lobby">
-        <h2>Create or Join a Game Room</h2>
-        <div>
-            <button id="create-room">Create Room</button>
-        </div>
-        <div>
-            <input id="join-room-id" type="text" placeholder="Enter Room ID">
-            <button id="join-room">Join Room</button>
-        </div>
-    </div>
-    <div id="game" style="display: none;">
-        <div id="status">Waiting for opponent...</div>
-        <div id="board"></div>
-        <button id="restart">Restart Game</button>
-    </div>
+    <h1>Tic Tac Toe - 5 in a Row vs Bot</h1>
+    <div id="status">Your turn (X)</div>
+    <div id="board"></div>
+    <button id="restart">Restart Game</button>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.2/socket.io.min.js"></script>
     <script>
-        const socket = io();
-        const lobby = document.getElementById('lobby');
-        const game = document.getElementById('game');
-        const board = document.getElementById('board');
-        const status = document.getElementById('status');
+        const boardElement = document.getElementById('board');
+        const statusElement = document.getElementById('status');
         const restartBtn = document.getElementById('restart');
-        const createRoomBtn = document.getElementById('create-room');
-        const joinRoomBtn = document.getElementById('join-room');
-        const joinRoomIdInput = document.getElementById('join-room-id');
         const gridSize = 10;
         let gameBoard = Array(gridSize * gridSize).fill('');
-        let playerSymbol = null;
-        let currentPlayer = 'X';
-        let playsLeft = { X: 5, O: 5 };
-        let gameActive = false;
-        let roomId = null;
+        let currentPlayer = 'X'; // Human is X, Bot is O
+        let gameActive = true;
 
         // Initialize the game board
         function createBoard() {
-            board.style.gridTemplateColumns = `repeat(${gridSize}, 60px)`;
-            board.innerHTML = '';
+            boardElement.style.gridTemplateColumns = `repeat(${gridSize}, 60px)`;
+            boardElement.innerHTML = '';
             gameBoard.forEach((_, index) => {
                 const cell = document.createElement('div');
                 cell.classList.add('cell');
                 cell.dataset.index = index;
                 cell.addEventListener('click', handleCellClick);
-                board.appendChild(cell);
+                boardElement.appendChild(cell);
             });
         }
 
-        // Handle cell click
+        // Handle human cell click
         function handleCellClick(e) {
-            if (!gameActive || playerSymbol !== currentPlayer) return;
+            if (currentPlayer !== 'X' || !gameActive) return; // Only allow human (X) to click
             const index = e.target.dataset.index;
-            if (gameBoard[index] === '' && playsLeft[playerSymbol] > 0) {
-                socket.emit('makeMove', { roomId, index, player: playerSymbol });
+            if (gameBoard[index] === '') {
+                makeMove(index, 'X');
+                if (gameActive && gameBoard.includes('')) {
+                    setTimeout(botMove, 500); // Bot moves after a short delay
+                }
             }
         }
 
-        // Update board with move
+        // Make a move (for both human and bot)
         function makeMove(index, player) {
             gameBoard[index] = player;
-            board.children[index].textContent = player;
-            playsLeft[player]--;
+            boardElement.children[index].textContent = player;
             updateStatus();
             if (checkWin(player)) {
-                status.textContent = `${player === playerSymbol ? 'You win! 5 in a row!' : 'Opponent wins! 5 in a row!'}`;
-                status.style.color = '#4CAF50';
+                statusElement.textContent = `${player === 'X' ? 'You win! 5 in a row!' : 'Bot wins! 5 in a row!'}`;
+                statusElement.style.color = '#4CAF50';
                 gameActive = false;
-            } else if (playsLeft.X === 0 && playsLeft.O === 0) {
-                status.textContent = "It's a draw!";
-                status.style.color = '#FF5733';
+            } else if (!gameBoard.includes('')) {
+                statusElement.textContent = "It's a draw!";
+                statusElement.style.color = '#FF5733';
                 gameActive = false;
             } else {
                 currentPlayer = player === 'X' ? 'O' : 'X';
@@ -151,13 +112,79 @@
             }
         }
 
+        // Bot move with IQ 200 (minimax algorithm)
+        function botMove() {
+            if (!gameActive || !gameBoard.includes('')) return;
+            const bestMove = findBestMove();
+            if (bestMove !== null) {
+                makeMove(bestMove, 'O');
+            }
+        }
+
+        // Minimax algorithm for best move
+        function findBestMove() {
+            let bestScore = -Infinity;
+            let bestMove = null;
+            const emptyCells = gameBoard
+                .map((val, idx) => (val === '' ? idx : null))
+                .filter(val => val !== null);
+
+            for (const index of emptyCells) {
+                gameBoard[index] = 'O';
+                const score = minimax(gameBoard, 0, false, -Infinity, Infinity);
+                gameBoard[index] = '';
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = index;
+                }
+            }
+            return bestMove;
+        }
+
+        // Minimax algorithm with alpha-beta pruning
+        function minimax(board, depth, isMaximizing, alpha, beta) {
+            if (checkWin('O')) return 100 - depth;
+            if (checkWin('X')) return -100 + depth;
+            if (!board.includes('')) return 0;
+
+            if (isMaximizing) {
+                let bestScore = -Infinity;
+                const emptyCells = board
+                    .map((val, idx) => (val === '' ? idx : null))
+                    .filter(val => val !== null);
+                for (const index of emptyCells) {
+                    board[index] = 'O';
+                    const score = minimax(board, depth + 1, false, alpha, beta);
+                    board[index] = '';
+                    bestScore = Math.max(score, bestScore);
+                    alpha = Math.max(alpha, bestScore);
+                    if (beta <= alpha) break;
+                }
+                return bestScore;
+            } else {
+                let bestScore = Infinity;
+                const emptyCells = board
+                    .map((val, idx) => (val === '' ? idx : null))
+                    .filter(val => val !== null);
+                for (const index of emptyCells) {
+                    board[index] = 'X';
+                    const score = minimax(board, depth + 1, true, alpha, beta);
+                    board[index] = '';
+                    bestScore = Math.min(score, bestScore);
+                    beta = Math.min(beta, bestScore);
+                    if (beta <= alpha) break;
+                }
+                return bestScore;
+            }
+        }
+
         // Update status message
         function updateStatus() {
             if (!gameActive) return;
-            status.textContent = currentPlayer === playerSymbol 
-                ? `Your turn (${playerSymbol}) - Plays left: ${playsLeft[playerSymbol]}`
-                : `Opponent's turn - Plays left: ${playsLeft[currentPlayer]}`;
-            status.style.color = '#000';
+            statusElement.textContent = currentPlayer === 'X' 
+                ? `Your turn (X)`
+                : `Bot's turn (O)`;
+            statusElement.style.color = '#000';
         }
 
         // Check for a win (5 in a row)
@@ -180,7 +207,7 @@
                     }
                 }
             }
-            // Check main diagonals (top-left to bottom-right)
+            // Check main diagonals
             for (let row = 0; row <= gridSize - 5; row++) {
                 for (let col = 0; col <= gridSize - 5; col++) {
                     const start = row * gridSize + col;
@@ -189,7 +216,7 @@
                     }
                 }
             }
-            // Check anti-diagonals (top-right to bottom-left)
+            // Check anti-diagonals
             for (let row = 0; row <= gridSize - 5; row++) {
                 for (let col = 4; col < gridSize; col++) {
                     const start = row * gridSize + col;
@@ -201,61 +228,23 @@
             return false;
         }
 
-        // Create room
-        createRoomBtn.addEventListener('click', () => {
-            socket.emit('createRoom');
-        });
-
-        // Join room
-        joinRoomBtn.addEventListener('click', () => {
-            const inputRoomId = joinRoomIdInput.value.trim();
-            if (inputRoomId) {
-                socket.emit('joinRoom', inputRoomId);
-            } else {
-                alert('Please enter a Room ID');
-            }
-        });
-
-        // Restart game
-        restartBtn.addEventListener('click', () => {
-            socket.emit('restartGame', roomId);
-        });
-
-        // Socket.IO event handlers
-        socket.on('roomCreated', (id) => {
-            roomId = id;
-            playerSymbol = 'X';
-            lobby.style.display = 'none';
-            game.style.display = 'block';
-            status.textContent = `Room ID: ${roomId} - Waiting for opponent...`;
-            createBoard();
-        });
-
-        socket.on('roomJoined', (data) => {
-            roomId = data.roomId;
-            playerSymbol = data.playerSymbol;
-            lobby.style.display = 'none';
-            game.style.display = 'block';
-            gameActive = true;
-            playsLeft = { X: 5, O: 5 };
-            currentPlayer = 'X';
-            updateStatus();
-            createBoard();
-        });
-
-        socket.on('moveMade', (data) => {
-            makeMove(data.index, data.player);
-        });
-
-        socket.on('gameRestarted', () => {
+        // Restart the game
+        function restartGame() {
             gameBoard = Array(gridSize * gridSize).fill('');
-            playsLeft = { X: 5, O: 5 };
             currentPlayer = 'X';
             gameActive = true;
             updateStatus();
             createBoard();
-        });
+        }
 
+        // Event listener for restart button
+        restartBtn.addEventListener('click', restartGame);
+
+        // Initialize the game
+        createBoard();
+    </script>
+</body>
+</html>
         socket.on('error', (message) => {
             alert(message);
         });
