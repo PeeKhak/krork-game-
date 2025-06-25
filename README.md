@@ -1,6 +1,5 @@
 # krork-game-
 <!DOCTYPE html>
-<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -112,70 +111,85 @@
             }
         }
 
-        // Bot move with IQ 200 (minimax algorithm)
+        // Bot move with IQ 150 (strategic but not perfect)
         function botMove() {
             if (!gameActive || !gameBoard.includes('')) return;
-            const bestMove = findBestMove();
-            if (bestMove !== null) {
-                makeMove(bestMove, 'O');
+            const move = findBestMove();
+            if (move !== null) {
+                makeMove(move, 'O');
             }
         }
 
-        // Minimax algorithm for best move
+        // Find best move for bot
         function findBestMove() {
-            let bestScore = -Infinity;
-            let bestMove = null;
+            // 1. Check for immediate win (5 in a row for O)
+            let move = checkForWinOrBlock('O', 5);
+            if (move !== null) return move;
+            // 2. Block player's immediate win (5 in a row for X)
+            move = checkForWinOrBlock('X', 5);
+            if (move !== null) return move;
+            // 3. Set up or block 4 in a row
+            move = checkForWinOrBlock('O', 4);
+            if (move !== null) return move;
+            move = checkForWinOrBlock('X', 4);
+            if (move !== null) return move;
+            // 4. Fallback to random move
             const emptyCells = gameBoard
                 .map((val, idx) => (val === '' ? idx : null))
                 .filter(val => val !== null);
-
-            for (const index of emptyCells) {
-                gameBoard[index] = 'O';
-                const score = minimax(gameBoard, 0, false, -Infinity, Infinity);
-                gameBoard[index] = '';
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestMove = index;
-                }
+            if (emptyCells.length > 0) {
+                return emptyCells[Math.floor(Math.random() * emptyCells.length)];
             }
-            return bestMove;
+            return null;
         }
 
-        // Minimax algorithm with alpha-beta pruning
-        function minimax(board, depth, isMaximizing, alpha, beta) {
-            if (checkWin('O')) return 100 - depth;
-            if (checkWin('X')) return -100 + depth;
-            if (!board.includes('')) return 0;
-
-            if (isMaximizing) {
-                let bestScore = -Infinity;
-                const emptyCells = board
-                    .map((val, idx) => (val === '' ? idx : null))
-                    .filter(val => val !== null);
-                for (const index of emptyCells) {
-                    board[index] = 'O';
-                    const score = minimax(board, depth + 1, false, alpha, beta);
-                    board[index] = '';
-                    bestScore = Math.max(score, bestScore);
-                    alpha = Math.max(alpha, bestScore);
-                    if (beta <= alpha) break;
+        // Check for potential win or block for n in a row
+        function checkForWinOrBlock(player, n) {
+            // Check rows
+            for (let row = 0; row < gridSize; row++) {
+                for (let col = 0; col <= gridSize - 5; col++) {
+                    const start = row * gridSize + col;
+                    const line = [0, 1, 2, 3, 4].map(i => gameBoard[start + i]);
+                    if (line.filter(cell => cell === player).length === n - 1 && line.includes('')) {
+                        const emptyIndex = line.indexOf('');
+                        return start + emptyIndex;
+                    }
                 }
-                return bestScore;
-            } else {
-                let bestScore = Infinity;
-                const emptyCells = board
-                    .map((val, idx) => (val === '' ? idx : null))
-                    .filter(val => val !== null);
-                for (const index of emptyCells) {
-                    board[index] = 'X';
-                    const score = minimax(board, depth + 1, true, alpha, beta);
-                    board[index] = '';
-                    bestScore = Math.min(score, bestScore);
-                    beta = Math.min(beta, bestScore);
-                    if (beta <= alpha) break;
-                }
-                return bestScore;
             }
+            // Check columns
+            for (let col = 0; col < gridSize; col++) {
+                for (let row = 0; row <= gridSize - 5; row++) {
+                    const start = row * gridSize + col;
+                    const line = [0, 1, 2, 3, 4].map(i => gameBoard[start + i * gridSize]);
+                    if (line.filter(cell => cell === player).length === n - 1 && line.includes('')) {
+                        const emptyIndex = line.indexOf('');
+                        return start + emptyIndex * gridSize;
+                    }
+                }
+            }
+            // Check main diagonals
+            for (let row = 0; row <= gridSize - 5; row++) {
+                for (let col = 0; col <= gridSize - 5; col++) {
+                    const start = row * gridSize + col;
+                    const line = [0, 1, 2, 3, 4].map(i => gameBoard[start + i * (gridSize + 1)]);
+                    if (line.filter(cell => cell === player).length === n - 1 && line.includes('')) {
+                        const emptyIndex = line.indexOf('');
+                        return start + emptyIndex * (gridSize + 1);
+                    }
+                }
+            }
+            // Check anti-diagonals
+            for (let row = 0; row <= gridSize - 5; row++) {
+                for (let col = 4; col < gridSize; col++) {
+                    const start = row * gridSize + col;
+                    const line = [0, 1, 2, 3, 4].map(i => gameBoard[start + i * (gridSize - 1)]);
+                    if (line.filter(cell => cell === player).length === n - 1 && line.includes('')) {
+                        const emptyIndex = line.indexOf('');
+                        return start + emptyIndex * (gridSize - 1);
+                    }
+                }
+            }
+            return null;
         }
 
         // Update status message
@@ -242,13 +256,6 @@
 
         // Initialize the game
         createBoard();
-    </script>
-</body>
-</html>
-</html>
-        socket.on('error', (message) => {
-            alert(message);
-        });
     </script>
 </body>
 </html>
