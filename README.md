@@ -245,6 +245,7 @@
     </script>
 </body>
 </html>
+</html>
         socket.on('error', (message) => {
             alert(message);
         });
